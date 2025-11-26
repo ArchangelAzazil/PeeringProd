@@ -7,262 +7,198 @@
     <meta name="description" content="Free proxy peering & latency diagnostic tool by Anton Systems">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #000000;
-            min-height: 100vh;
-            color: #e2e8f0;
-        }
-        .glass { 
-            background: rgba(20, 20, 30, 0.95); 
-            backdrop-filter: blur(12px); 
-            border: 1px solid rgba(100, 116, 139, 0.3); 
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
-        }
-        .btn-anton { 
-            background: linear-gradient(135deg, #f59e0b, #d97706); 
-            transition: all 0.3s; 
-        }
-        .btn-anton:hover { 
-            transform: translateY(-4px); 
-            box-shadow: 0 20px 40px rgba(217, 119, 6, 0.6); 
-        }
-        .loader { 
-            border: 8px solid #1a1a1a; 
-            border-top: 8px solid #f59e0b; 
-            border-radius: 50%; 
-            width: 60px; 
-            height: 60px; 
-            animation: spin 1s linear infinite; 
-            margin: 0 auto;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        #speedtest-container, #post-speedtest-container {
-            height: 320px;
-            background: rgba(30, 30, 50, 0.9);
-            border-radius: 16px;
-            padding: 16px;
-            border: 1px solid #333;
-        }
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            border-radius: 12px;
-        }
+        body{font-family:'Inter',sans-serif;background:#000;color:#e2e8f0;min-height:100vh}
+        .glass{background:rgba(20,20,30,0.95);backdrop-filter:blur(12px);border:1px solid rgba(100,116,139,0.3);box-shadow:0 8px 32px rgba(0,0,0,0.8)}
+        .btn-anton{background:linear-gradient(135deg,#f59e0b,#d97706);transition:all .3s}
+        .btn-anton:hover{transform:translateY(-4px);box-shadow:0 20px 40px rgba(217,119,6,0.6)}
+        .loader{border:8px solid #1a1a1a;border-top:8px solid #f59e0b;border-radius:50%;width:60px;height:60px;animation:spin 1s linear infinite;margin:0 auto}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        iframe{width:100%;height:100%;border:none;border-radius:12px}
+        #speedtest-container,#post-speedtest-container{height:340px;background:rgba(30,30,50,0.9);border-radius:16px;padding:16px;border:1px solid #333}
     </style>
 </head>
 <body class="p-6">
-    <div class="max-w-6xl mx-auto">
-        <div class="text-center mb-12">
-            <img src="assets/logo.png" alt="Anton Systems" 
-                 class="w-80 h-80 mx-auto mb-6 object-contain drop-shadow-2xl"
-                 onerror="this.src='https://via.placeholder.com/320?text=Logo+Missing';">
-            <h1 class="text-7xl font-black text-amber-400 drop-shadow-2xl tracking-tighter">Anton Systems</h1>
-            <p class="text-3xl text-amber-200 mt-3">Proxy Peering & Latency Diagnostic Tool</p>
-        </div>
-
-        <div class="glass p-10 rounded-3xl shadow-2xl space-y-10">
-            <div class="grid md:grid-cols-2 gap-8">
-                <div>
-                    <label class="block text-amber-300 font-bold mb-3 text-lg">Your Location (City, Country)</label>
-                    <input type="text" id="userLocation" value="New York, US" 
-                           class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
-                </div>
-                <div>
-                    <label class="block text-amber-300 font-bold mb-3 text-lg">Proxy IP Address</label>
-                    <input type="text" id="proxyIP" value="92.113.218.160" 
-                           class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
-                </div>
-            </div>
-            <button onclick="startAnalysis()" 
-                    class="btn-anton w-full py-7 rounded-2xl font-black text-4xl text-black shadow-2xl tracking-wider">
-                ANALYZE PROXY & FIND OPTIMAL ROUTE
-            </button>
-        </div>
-
-        <div id="results" class="glass p-12 mt-12 rounded-3xl shadow-2xl space-y-14 hidden">
-            <h2 class="text-6xl font-bold text-amber-400 text-center mb-10">DIAGNOSTIC RESULTS</h2>
-
-            <div class="grid md:grid-cols-3 gap-10 text-center">
-                <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900">
-                    <span class="text-amber-300 text-xl block mb-3">Exit Location</span>
-                    <span id="proxyLocation" class="text-4xl font-bold text-white">--</span>
-                </div>
-                <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900">
-                    <span class="text-amber-300 text-xl block mb-3">ISP / ASN</span>
-                    <span id="proxyISP" class="text-3xl font-bold text-white">--</span>
-                </div>
-                <div class="bg-gray-900/80 p-10 rounded-2xl text-sm border border-amber-900">
-                    <span class="text-amber-300 block mb-3">PeeringDB</span>
-                    <span id="pdbSummary" class="text-gray-300">Loading...</span>
-                </div>
-            </div>
-
-            <div class="text-center">
-                <h3 class="text-4xl font-bold text-amber-300 mb-8">1. Baseline Speedtest (Current Route)</h3>
-                <div id="speedtest-container"></div>
-                <button onclick="runBaselineSpeedtest()" 
-                        class="btn-anton py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Baseline Test</button>
-                <p id="baselineResults" class="mt-8 text-3xl hidden text-amber-200">
-                    Ping: <span id="baselinePing">--</span> ms | DL: <span id="baselineDownload">--</span> Mbps
-                </p>
-            </div>
-
-            <div class="text-amber-300 text-center mt-8 text-lg max-w-3xl mx-auto">
-                <strong>Baseline Test</strong> → measures your current speed through the proxy (as-is)<br>
-                <strong>Post-Route Test</strong> → connect to the suggested hub via VPN first, then run this
-            </div>
-
-            <div id="alternateRouteSection" class="hidden bg-gradient-to-r from-amber-900/40 to-orange-900/40 p-12 rounded-3xl border-4 border-amber-600">
-                <h3 class="text-5xl font-bold text-amber-100 mb-8">OPTIMAL ROUTE RECOMMENDATION</h3>
-                <div class="text-5xl font-mono text-amber-50 mb-6" id="suggestedRoutePath">--</div>
-                <p class="text-amber-200 text-2xl" id="routeReason">--</p>
-            </div>
-
-            <div id="postRouteSpeedtestSection" class="hidden text-center">
-                <h3 class="text-4xl font-bold text-green-400 mb-8">2. After Applying Route</h3>
-                <div id="post-speedtest-container"></div>
-                <button onclick="runPostSpeedtest()" 
-                        class="bg-green-600 hover:bg-green-500 py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Post-Route Test</button>
-                <p id="postResults" class="mt-8 text-3xl hidden text-green-300">
-                    Ping: <span id="postPing">--</span> ms | DL: <span id="postDownload">--</span> Mbps
-                </p>
-                <p id="comparison" class="text-5xl font-bold text-green-400 mt-12 hidden">
-                    Improvement → Ping <span id="pingDelta">--</span> ms | Download <span id="dlDelta">--</span> Mbps
-                </p>
-            </div>
-
-            <div class="text-center mt-16">
-                <a id="pingPeLink" target="_blank" 
-                   class="inline-block bg-emerald-600 hover:bg-emerald-500 py-6 px-20 rounded-2xl font-bold text-3xl shadow-2xl">
-                    Global MTR / Traceroute Test
-                </a>
-            </div>
-
-            <div id="loadingIndicator" class="hidden text-center py-32">
-                <div class="loader"></div>
-                <p class="text-4xl text-amber-300 mt-10">Charting the optimal course...</p>
-            </div>
-            <p id="errorMsg" class="text-red-400 text-center font-bold text-4xl hidden"></p>
-        </div>
+<div class="max-w-6xl mx-auto">
+    <div class="text-center mb-12">
+        <img src="assets/logo.png" alt="Anton Systems" class="w-80 h-80 mx-auto mb-6 object-contain drop-shadow-2xl">
+        <h1 class="text-7xl font-black text-amber-400 drop-shadow-2xl tracking-tighter">Anton Systems</h1>
+        <p class="text-3xl text-amber-200 mt-3">Proxy Peering & Latency Diagnostic Tool</p>
     </div>
 
-    <script>
-        const TOKEN = atob("NzBhMDA2Y2NkNTlmMTA=");
+    <div class="glass p-10 rounded-3xl shadow-2xl space-y-10">
+        <div class="grid md:grid-cols-2 gap-8">
+            <div>
+                <label class="block text-amber-300 font-bold mb-3 text-lg">Your Location (City, Country)</label>
+                <input type="text" id="userLocation" value="New York, US" class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
+            </div>
+            <div>
+                <label class="block text-amber-300 font-bold mb-3 text-lg">Proxy (supports username:password@ip:port)</label>
+                <input type="text" id="proxyInput" placeholder="username:password@212.236.143.95:8080" class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
+            </div>
+        </div>
+        <button onclick="startAnalysis()" class="btn-anton w-full py-7 rounded-2xl font-black text-4xl text-black shadow-2xl tracking-wider">
+            ANALYZE PROXY & FIND OPTIMAL ROUTE
+        </button>
+    </div>
 
-        async function fetchIPInfo(ip) {
-            const r = await fetch(`https://ipinfo.io/${ip}/json?token=${TOKEN}`);
-            if (!r.ok) throw new Error("IPinfo failed");
-            return r.json();
+    <div id="results" class="glass p-12 mt-12 rounded-3xl shadow-2xl space-y-14 hidden">
+        <h2 class="text-6xl font-bold text-amber-400 text-center mb-10">DIAGNOSTIC RESULTS</h2>
+        <div class="grid md:grid-cols-3 gap-10 text-center">
+            <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900"><span class="text-amber-300 text-xl block mb-3">Exit Location</span><span id="proxyLocation" class="text-4xl font-bold text-white">--</span></div>
+            <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900"><span class="text-amber-300 text-xl block mb-3">ISP / ASN</span><span id="proxyISP" class="text-3xl font-bold text-white">--</span></div>
+            <div class="bg-gray-900/80 p-10 rounded-2xl text-sm border border-amber-900"><span class="text-amber-300 block mb-3">PeeringDB</span><span id="pdbSummary" class="text-gray-300">--</span></div>
+        </div>
+
+        <div class="text-center">
+            <h3 class="text-4xl font-bold text-amber-300 mb-8">1. Baseline Speedtest (Current Route)</h3>
+            <div id="speedtest-container"></div>
+            <button onclick="runBaselineSpeedtest()" class="btn-anton py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Baseline Test</button>
+            <p id="baselineResults" class="mt-8 text-3xl hidden text-amber-200">Ping: <span id="baselinePing">--</span> ms | DL: <span id="baselineDownload">--</span> MBps</p>
+        </div>
+
+        <div class="text-amber-300 text-center mt-8 text-lg max-w-3xl mx-auto">
+            <strong>Baseline Test</strong> → current real proxy speed<br>
+            <strong>Post-Route Test</strong> → connect via suggested route first, then run
+        </div>
+
+        <div id="alternateRouteSection" class="hidden bg-gradient-to-r from-amber-900/40 to-orange-900/40 p-12 rounded-3xl border-4 border-amber-600 text-center">
+            <h3 class="text-5xl font-bold text-amber-100 mb-8">OPTIMAL ROUTE RECOMMENDATION</h3>
+            <div class="text-5xl font-mono text-amber-50 mb-6" id="suggestedRoutePath">--</div>
+            <p class="text-amber-200 text-2xl" id="routeReason">--</p>
+        </div>
+
+        <div id="postRouteSpeedtestSection" class="hidden text-center">
+            <h3 class="text-4xl font-bold text-green-400 mb-8">2. After Applying Route</h3>
+            <div id="post-speedtest-container"></div>
+            <button onclick="runPostSpeedtest()" class="bg-green-600 hover:bg-green-500 py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Post-Route Test</button>
+            <p id="postResults" class="mt-8 text-3xl hidden text-green-300">Ping: <span id="postPing">--</span> ms | DL: <span id="postDownload">--</span> MBps</p>
+            <p id="comparison" class="text-5xl font-bold text-green-400 mt-12 hidden">Improvement → Ping <span id="pingDelta">--</span> ms | Download <span id="dlDelta">--</span> MBps</p>
+        </div>
+
+        <div class="text-center mt-16">
+            <a id="pingPeLink" target="_blank" class="inline-block bg-emerald-600 hover:bg-emerald-500 py-6 px-20 rounded-2xl font-bold text-3xl shadow-2xl">Global MTR / TracerRoute Test</a>
+        </div>
+
+        <div id="loadingIndicator" class="hidden text-center py-32"><div class="loader"></div><p class="text-4xl text-amber-300 mt-10">Charting the optimal course...</p></div>
+        <p id="errorMsg" class="text-red-400 text-center font-bold text-4xl hidden"></p>
+    </div>
+</div>
+
+<script>
+    const TOKEN = atob("NzBhMDA2Y2NkNTlmMTA=");
+    let currentProxy = null;
+
+    // Parse proxy string (supports username:password@ip:port or just ip:port)
+    function parseProxy(input) {
+        const regex = /^(?:([^:]+):([^@]+)@)?([^:]+):(\d+)$/;
+        const match = input.trim().match(regex);
+        if (!match) return { ip: input.trim() };
+        const [, user, pass, ip, port] = match;
+        return { ip, port, user, pass };
+    }
+
+    async function fetchIPInfo(ip) {
+        const r = await fetch(`https://ipinfo.io/${ip}/json?token=${TOKEN}`);
+        if (!r.ok) throw new Error("IPinfo failed");
+        return r.json();
+    }
+
+    async function fetchPeeringDB(asn) {
+        try {
+            const net = await fetch(`https://www.peeringdb.com/api/net?asn=${asn}`).then(r=>r.json());
+            if (!net.data?.length) return "No record";
+            const n = net.data[0];
+            const ix = await fetch(`https://www.peeringdb.com/api/netixlan?net_id=${n.id}`).then(r=>r.json());
+            const ixps = ix.data?.slice(0,5).map(x=>x.ix_name).join(', ') || 'None listed';
+            return `${n.name} – ${ixps}`;
+        } catch { return "Unavailable"; }
+    }
+
+    function suggestOptimalRoute(userLocation, proxyCity, proxyCountry) {
+        const userCountry = userLocation.split(',').pop().trim().toUpperCase();
+        let hub = "Frankfurt DE-CIX", reason = "Largest global IXP – best default path";
+        if (proxyCountry === "US" && !["US","CA"].includes(userCountry)) { hub = "Frankfurt → New York"; reason = "Optimal transatlantic routing"; }
+        else if (proxyCountry === "US" && ["US","CA"].includes(userCountry)) { hub = "Direct routing"; reason = "Both ends in North America"; }
+        document.getElementById('suggestedRoutePath').textContent = `${userLocation.split(',')[0].trim()} → ${hub} → ${proxyCity}, ${proxyCountry}`;
+        document.getElementById('routeReason').textContent = reason;
+    }
+
+    window.startAnalysis = async () => {
+        const input = document.getElementById('proxyInput').value.trim();
+        const loc = document.getElementById('userLocation').value.trim();
+        currentProxy = parseProxy(input);
+
+        document.getElementById('results').classList.add('hidden');
+        document.getElementById('loadingIndicator').classList.remove('hidden');
+
+        try {
+            const data = await fetchIPInfo(currentProxy.ip || input);
+            document.getElementById('proxyLocation').textContent = `${data.city || 'Unknown'}, ${data.country}`;
+            document.getElementById('proxyISP').textContent = data.org || 'Unknown';
+            const asn = data.org?.match(/AS(\d+)/i)?.[1];
+            document.getElementById('pdbSummary').textContent = asn ? await fetchPeeringDB(asn) : "No ASN";
+
+            suggestOptimalRoute(loc, data.city || "Proxy", data.country);
+            document.getElementById('pingPeLink').href = `https://ping.pe/${currentProxy.ip || input}`;
+            document.getElementById('pingPeLink').textContent = `Global Test → ${currentProxy.ip || input}`;
+
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('alternateRouteSection').classList.remove('hidden');
+            document.getElementById('postRouteSpeedtestSection').classList.remove('hidden');
+        } catch (err) {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            document.getElementById('errorMsg').textContent = "Error: " + err.message;
+            document.getElementById('errorMsg').classList.remove('hidden');
+        }
+    };
+
+    function runSpeedtest(isBaseline) {
+        const container = isBaseline ? 'speedtest-container' : 'post-speedtest-container';
+        const pingEl = isBaseline ? 'baselinePing' : 'postPing';
+        const dlEl = isBaseline ? 'baselineDownload' : 'postDownload';
+        const resultEl = isBaseline ? 'baselineResults' : 'postResults';
+
+        let url = "https://librespeed.org/?embed=1&theme=dark&telemetry=0";
+        if (currentProxy && currentProxy.user) {
+            const proxyUrl = `https://proxy.anton.systems/?${btoa(JSON.stringify(currentProxy))}`;
+            url = `https://librespeed.org/?embed=1&theme=dark&telemetry=0&proxy=${encodeURIComponent(proxyUrl)}`;
         }
 
-        async function fetchPeeringDB(asn) {
+        document.getElementById(container).innerHTML = `<iframe src="${url}" loading="lazy"></iframe>`;
+
+        const check = setInterval(() => {
+            const iframe = document.querySelector(`#${container} iframe`);
+            if (!iframe) return;
             try {
-                const net = await fetch(`https://www.peeringdb.com/api/net?asn=${asn}`).then(r => r.json());
-                if (!net.data?.length) return "No record";
-                const n = net.data[0];
-                const ix = await fetch(`https://www.peeringdb.com/api/netixlan?net_id=${n.id}`).then(r => r.json());
-                const ixps = ix.data?.slice(0,5).map(x => x.ix_name).join(', ') || 'None listed';
-                return `${n.name} – ${ixps}`;
-            } catch { return "Unavailable"; }
-        }
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                const ping = doc.querySelector('.ping-value')?.innerText;
+                const dl = doc.querySelector('.download-value')?.innerText;
+                if (ping && dl) {
+                    clearInterval(check);
+                    document.getElementById(pingEl).textContent = ping.replace(' ms','');
+                    document.getElementById(dlEl).textContent = dl.replace(' MBps','');
+                    document.getElementById(resultEl).classList.remove('hidden');
+                    if (!isBaseline) calculateImprovement();
+                }
+            } catch(e) {}
+        }, 2000);
+    }
 
-        function suggestOptimalRoute(userLocation, proxyCity, proxyCountry) {
-            const userCountry = userLocation.split(',').pop().trim().toUpperCase();
-            let hub = "Frankfurt DE-CIX";
-            let reason = "Largest global IXP – best default path";
+    function calculateImprovement() {
+        const oldP = parseFloat(document.getElementById('baselinePing').textContent);
+        const oldD = parseFloat(document.getElementById('baselineDownload').textContent);
+        const newP = parseFloat(document.getElementById('postPing').textContent);
+        const newD = parseFloat(document.getElementById('postDownload').textContent);
+        const deltaP = (oldP - newP).toFixed(0);
+        const deltaD = (newD - oldD).toFixed(1);
+        document.getElementById('pingDelta').textContent = deltaP > 0 ? `-${deltaP}` : `+${Math.abs(deltaP)}`;
+        document.getElementById('dlDelta').textContent = deltaD > 0 ? `+${deltaD}` : deltaD;
+        document.getElementById('comparison').classList.remove('hidden');
+    }
 
-            if (proxyCountry === "US" && !["US","CA"].includes(userCountry)) {
-                hub = "Frankfurt → New York";
-                reason = "Optimal transatlantic routing";
-            } else if (proxyCountry === "US" && ["US","CA"].includes(userCountry)) {
-                hub = "Direct routing";
-                reason = "Both ends in North America";
-            }
-
-            document.getElementById('suggestedRoutePath').textContent = 
-                `${userLocation.split(',')[0].trim()} → ${hub} → ${proxyCity}, ${proxyCountry}`;
-            document.getElementById('routeReason').textContent = reason;
-        }
-
-        window.startAnalysis = async () => {
-            const ip = document.getElementById('proxyIP').value.trim();
-            const loc = document.getElementById('userLocation').value.trim();
-
-            document.getElementById('results').classList.add('hidden');
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-
-            try {
-                const data = await fetchIPInfo(ip);
-
-                document.getElementById('proxyLocation').textContent = `${data.city || 'Unknown'}, ${data.country}`;
-                document.getElementById('proxyISP').textContent = data.org || 'Unknown';
-
-                const asnMatch = data.org?.match(/AS(\d+)/i);
-                const asn = asnMatch ? asnMatch[1] : null;
-                document.getElementById('pdbSummary').textContent = asn ? await fetchPeeringDB(asn) : "No ASN";
-
-                suggestOptimalRoute(loc, data.city || "Proxy", data.country);
-
-                document.getElementById('pingPeLink').href = `https://ping.pe/${ip}`;
-                document.getElementById('pingPeLink').textContent = `Global Test → ${ip}`;
-
-                document.getElementById('loadingIndicator').classList.add('hidden');
-                document.getElementById('results').classList.remove('hidden');
-                document.getElementById('alternateRouteSection').classList.remove('hidden');
-                document.getElementById('postRouteSpeedtestSection').classList.remove('hidden');
-
-            } catch (err) {
-                document.getElementById('loadingIndicator').classList.add('hidden');
-                document.getElementById('errorMsg').textContent = "Error: " + err.message;
-                document.getElementById('errorMsg').classList.remove('hidden');
-            }
-        };
-
-        // FIXED & BULLETPROOF SPEEDTEST (LibreSpeed)
-        function runSpeedtest(isBaseline) {
-            const container = isBaseline ? 'speedtest-container' : 'post-speedtest-container';
-            const pingEl = isBaseline ? 'baselinePing' : 'postPing';
-            const dlEl = isBaseline ? 'baselineDownload' : 'postDownload';
-            const resultEl = isBaseline ? 'baselineResults' : 'postResults';
-
-            document.getElementById(container).innerHTML = `
-                <iframe src="https://librespeed.org/?embed=1&theme=dark&telemetry=0" loading="lazy"></iframe>
-            `;
-
-            // Auto-capture results after test completes
-            const checkInterval = setInterval(() => {
-                const iframe = document.querySelector(`#${container} iframe`);
-                if (!iframe) return;
-                try {
-                    const doc = iframe.contentDocument || iframe.contentWindow.document;
-                    const ping = doc.querySelector('.ping-value')?.innerText;
-                    const download = doc.querySelector('.download-value')?.innerText;
-                    if (ping && download) {
-                        clearInterval(checkInterval);
-                        document.getElementById(pingEl).textContent = ping.replace(' ms', '');
-                        document.getElementById(dlEl).textContent = download.replace(' Mbps', '');
-                        document.getElementById(resultEl).classList.remove('hidden');
-
-                        if (!isBaseline) {
-                            const oldPing = parseFloat(document.getElementById('baselinePing').textContent);
-                            const oldDl = parseFloat(document.getElementById('baselineDownload').textContent);
-                            const newPing = parseFloat(ping.replace(' ms', ''));
-                            const newDl = parseFloat(download.replace(' Mbps', ''));
-                            const deltaP = (oldPing - newPing).toFixed(0);
-                            const deltaD = (newDl - oldDl).toFixed(1);
-                            document.getElementById('pingDelta').textContent = deltaP > 0 ? `-${deltaP}` : `+${Math.abs(deltaP)}`;
-                            document.getElementById('dlDelta').textContent = deltaD > 0 ? `+${deltaD}` : deltaD;
-                            document.getElementById('comparison').classList.remove('hidden');
-                        }
-                    }
-                } catch(e) {}
-            }, 2000);
-        }
-
-        window.runBaselineSpeedtest = () => runSpeedtest(true);
-        window.runPostSpeedtest = () => runSpeedtest(false);
-    </script>
+    window.runBaselineSpeedtest = () => runSpeedtest(true);
+    window.runPostSpeedtest = () => runSpeedtest(false);
+</script>
 </body>
 </html>
