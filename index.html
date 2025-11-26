@@ -10,95 +10,134 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: url('https://i.imgur.com/2fK8e9J.jpg') center/cover fixed;
+            background: #000000; /* Pure black background */
             min-height: 100vh;
             color: #e2e8f0;
         }
-        .glass { background: rgba(15,23,42,0.92); backdrop-filter: blur(12px); border: 1px solid rgba(100,116,139,0.3); }
-        .btn-anton { background: linear-gradient(135deg,#f59e0b,#d97706); transition: all 0.3s; }
-        .btn-anton:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(217,119,6,0.5); }
-        .loader { border-top-color: #f59e0b; animation: spin 1s linear infinite; }
+        .glass { 
+            background: rgba(20, 20, 30, 0.95); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(100, 116, 139, 0.3); 
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+        }
+        .btn-anton { 
+            background: linear-gradient(135deg, #f59e0b, #d97706); 
+            transition: all 0.3s; 
+        }
+        .btn-anton:hover { 
+            transform: translateY(-4px); 
+            box-shadow: 0 20px 40px rgba(217, 119, 6, 0.6); 
+        }
+        .loader { 
+            border: 8px solid #1a1a1a; 
+            border-top: 8px solid #f59e0b; 
+            border-radius: 50%; 
+            width: 60px; 
+            height: 60px; 
+            animation: spin 1s linear infinite; 
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
-        #speedtest-container, #post-speedtest-container { height: 240px; background: rgba(30,41,59,0.8); border-radius: 12px; padding: 12px; }
+        #speedtest-container, #post-speedtest-container { 
+            height: 260px; 
+            background: rgba(30, 30, 50, 0.9); 
+            border-radius: 16px; 
+            padding: 16px; 
+            border: 1px solid #333;
+        }
     </style>
 </head>
 <body class="p-6">
     <div class="max-w-6xl mx-auto">
-        <!-- YOUR REAL SKULL LOGO – NOW WORKING FOREVER -->
-        <div class="text-center mb-10">
-            <img src="assets/logo.png" alt="Anton Systems" class="w-64 mx-auto mb-6 rounded-full border-4 border-amber-600 shadow-2xl">
-            <h1 class="text-7xl font-black text-amber-400 drop-shadow-2xl">Anton Systems</h1>
-            <p class="text-3xl text-amber-200 mt-2">Proxy Peering & Latency Diagnostic Tool</p>
+        <!-- YOUR SKULL LOGO – NOW PERFECT SIZE & WORKING 100% -->
+        <div class="text-center mb-12">
+            <img src="assets/logo.png" 
+                 alt="Anton Systems" 
+                 class="w-80 h-80 mx-auto mb-6 object-contain drop-shadow-2xl"
+                 onerror="this.src='https://via.placeholder.com/320?text=Logo+Missing'; this.onerror=null;">
+            <h1 class="text-7xl font-black text-amber-400 drop-shadow-2xl tracking-tighter">Anton Systems</h1>
+            <p class="text-3xl text-amber-200 mt-3">Proxy Peering & Latency Diagnostic Tool</p>
         </div>
 
+        <!-- Input Card -->
         <div class="glass p-10 rounded-3xl shadow-2xl space-y-10">
             <div class="grid md:grid-cols-2 gap-8">
                 <div>
                     <label class="block text-amber-300 font-bold mb-3 text-lg">Your Location (City, Country)</label>
-                    <input type="text" id="userLocation" value="New York, US" class="w-full p-4 rounded-xl bg-slate-800/90 border border-amber-700 focus:border-amber-400 text-white text-lg">
+                    <input type="text" id="userLocation" value="New York, US" 
+                           class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
                 </div>
                 <div>
                     <label class="block text-amber-300 font-bold mb-3 text-lg">Proxy IP Address</label>
-                    <input type="text" id="proxyIP" value="92.113.218.160" class="w-full p-4 rounded-xl bg-slate-800/90 border border-amber-700 focus:border-amber-400 text-white text-lg">
+                    <input type="text" id="proxyIP" value="92.113.218.160" 
+                           class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
                 </div>
             </div>
-            <button onclick="startAnalysis()" class="btn-anton w-full py-6 rounded-2xl font-black text-3xl text-black shadow-2xl">
-                Analyze Proxy & Find Optimal Route
+            <button onclick="startAnalysis()" 
+                    class="btn-anton w-full py-7 rounded-2xl font-black text-4xl text-black shadow-2xl tracking-wider">
+                ANALYZE PROXY & FIND OPTIMAL ROUTE
             </button>
         </div>
 
-        <div id="results" class="glass p-10 mt-12 rounded-3xl shadow-2xl space-y-12 hidden">
-            <h2 class="text-5xl font-bold text-amber-400 text-center mb-8">Diagnostic Results</h2>
+        <!-- Results -->
+        <div id="results" class="glass p-12 mt-12 rounded-3xl shadow-2xl space-y-14 hidden">
+            <h2 class="text-6xl font-bold text-amber-400 text-center mb-10">DIAGNOSTIC RESULTS</h2>
 
-            <div class="grid md:grid-cols-3 gap-8 text-center">
-                <div class="bg-slate-800/70 p-8 rounded-2xl">
-                    <span class="text-amber-300 text-xl block mb-2">Exit Location</span>
-                    <span id="proxyLocation" class="text-3xl font-bold">--</span>
+            <div class="grid md:grid-cols-3 gap-10 text-center">
+                <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900">
+                    <span class="text-amber-300 text-xl block mb-3">Exit Location</span>
+                    <span id="proxyLocation" class="text-4xl font-bold text-white">--</span>
                 </div>
-                <div class="bg-slate-800/70 p-8 rounded-2xl">
-                    <span class="text-amber-300 text-xl block mb-2">ISP / ASN</span>
-                    <span id="proxyISP" class="text-2xl font-bold">--</span>
+                <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900">
+                    <span class="text-amber-300 text-xl block mb-3">ISP / ASN</span>
+                    <span id="proxyISP" class="text-3xl font-bold text-white">--</span>
                 </div>
-                <div class="bg-slate-800/70 p-8 rounded-2xl text-sm">
-                    <span class="text-amber-300 block mb-2">PeeringDB</span>
-                    <span id="pdbSummary">--</span>
+                <div class="bg-gray-900/80 p-10 rounded-2xl text-sm border border-amber-900">
+                    <span class="text-amber-300 block mb-3">PeeringDB</span>
+                    <span id="pdbSummary" class="text-gray-300">Loading...</span>
                 </div>
             </div>
 
             <div class="text-center">
-                <h3 class="text-3xl font-bold text-amber-300 mb-6">1. Baseline Speedtest (Current Route)</h3>
+                <h3 class="text-4xl font-bold text-amber-300 mb-8">1. Baseline Speedtest (Current Route)</h3>
                 <div id="speedtest-container"></div>
-                <button onclick="runBaselineSpeedtest()" class="btn-anton py-4 px-10 rounded-xl font-bold text-xl mt-6">Run Baseline Test</button>
-                <p id="baselineResults" class="mt-6 text-2xl hidden text-amber-200">Ping: <span id="baselinePing">--</span> ms | DL: <span id="baselineDownload">--</span> Mbps</p>
+                <button onclick="runBaselineSpeedtest()" 
+                        class="btn-anton py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Baseline Test</button>
+                <p id="baselineResults" class="mt-8 text-3xl hidden text-amber-200">
+                    Ping: <span id="baselinePing">--</span> ms | DL: <span id="baselineDownload">--</span> Mbps
+                </p>
             </div>
 
-            <div id="alternateRouteSection" class="hidden bg-gradient-to-r from-amber-900/60 to-orange-900/60 p-10 rounded-3xl border-4 border-amber-500 text-center">
-                <h3 class="text-4xl font-bold text-amber-100 mb-6">Optimal Route Recommendation</h3>
-                <div class="text-4xl font-mono text-amber-50 mb-4" id="suggestedRoutePath">--</div>
-                <p class="text-amber-200 text-xl" id="routeReason">--</p>
+            <div id="alternateRouteSection" class="hidden bg-gradient-to-r from-amber-900/40 to-orange-900/40 p-12 rounded-3xl border-4 border-amber-600">
+                <h3 class="text-5xl font-bold text-amber-100 mb-8">OPTIMAL ROUTE RECOMMENDATION</h3>
+                <div class="text-5xl font-mono text-amber-50 mb-6" id="suggestedRoutePath">--</div>
+                <p class="text-amber-200 text-2xl" id="routeReason">--</p>
             </div>
 
             <div id="postRouteSpeedtestSection" class="hidden text-center">
-                <h3 class="text-3xl font-bold text-green-400 mb-6">2. After Route Change</h3>
+                <h3 class="text-4xl font-bold text-green-400 mb-8">2. After Applying Route</h3>
                 <div id="post-speedtest-container"></div>
-                <button onclick="runPostSpeedtest()" class="bg-green-600 hover:bg-green-500 py-4 px-10 rounded-xl font-bold text-xl mt-6">Run Post-Route Test</button>
-                <p id="postResults" class="mt-6 text-2xl hidden text-green-300">Ping: <span id="postPing">--</span> ms | DL: <span id="postDownload">--</span> Mbps</p>
-                <p id="comparison" class="text-4xl font-bold text-green-400 mt-8 hidden">
+                <button onclick="runPostSpeedtest()" 
+                        class="bg-green-600 hover:bg-green-500 py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Post-Route Test</button>
+                <p id="postResults" class="mt-8 text-3xl hidden text-green-300">
+                    Ping: <span id="postPing">--</span> ms | DL: <span id="postDownload">--</span> Mbps
+                </p>
+                <p id="comparison" class="text-5xl font-bold text-green-400 mt-12 hidden">
                     Improvement → Ping <span id="pingDelta">--</span> ms | Download <span id="dlDelta">--</span> Mbps
                 </p>
             </div>
 
-            <div class="text-center mt-12">
-                <a id="pingPeLink" target="_blank" class="inline-block bg-emerald-600 hover:bg-emerald-500 py-5 px-16 rounded-2xl font-bold text-2xl shadow-xl">
+            <div class="text-center mt-16">
+                <a id="pingPeLink" target="_blank" 
+                   class="inline-block bg-emerald-600 hover:bg-emerald-500 py-6 px-20 rounded-2xl font-bold text-3xl shadow-2xl">
                     Global MTR / Traceroute Test
                 </a>
             </div>
 
-            <div id="loadingIndicator" class="hidden text-center py-20">
-                <div class="loader ease-linear rounded-full border-12 border-t-12 border-slate-700 h-20 w-20 mx-auto"></div>
-                <p class="text-3xl text-amber-300 mt-8">Charting the optimal course...</p>
+            <div id="loadingIndicator" class="hidden text-center py-32">
+                <div class="loader mx-auto"></div>
+                <p class="text-4xl text-amber-300 mt-10">Charting the optimal course...</p>
             </div>
-            <p id="errorMsg" class="text-red-400 text-center font-bold text-3xl hidden"></p>
+            <p id="errorMsg" class="text-red-400 text-center font-bold text-4xl hidden"></p>
         </div>
     </div>
 
