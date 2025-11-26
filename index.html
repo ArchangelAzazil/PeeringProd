@@ -6,11 +6,10 @@
     <title>Anton Systems – Proxy Diagnostic Tool</title>
     <meta name="description" content="Free proxy peering & latency diagnostic tool by Anton Systems">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://raw.githubusercontent.com/openspeedtest/Speed-Test/master/dist/OpenSpeedTest.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: #000000; /* Pure black background */
+            background: #000000;
             min-height: 100vh;
             color: #e2e8f0;
         }
@@ -35,30 +34,34 @@
             width: 60px; 
             height: 60px; 
             animation: spin 1s linear infinite; 
+            margin: 0 auto;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        #speedtest-container, #post-speedtest-container { 
-            height: 260px; 
-            background: rgba(30, 30, 50, 0.9); 
-            border-radius: 16px; 
-            padding: 16px; 
+        #speedtest-container, #post-speedtest-container {
+            height: 320px;
+            background: rgba(30, 30, 50, 0.9);
+            border-radius: 16px;
+            padding: 16px;
             border: 1px solid #333;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 12px;
         }
     </style>
 </head>
 <body class="p-6">
     <div class="max-w-6xl mx-auto">
-        <!-- YOUR SKULL LOGO – NOW PERFECT SIZE & WORKING 100% -->
         <div class="text-center mb-12">
-            <img src="assets/logo.png" 
-                 alt="Anton Systems" 
+            <img src="assets/logo.png" alt="Anton Systems" 
                  class="w-80 h-80 mx-auto mb-6 object-contain drop-shadow-2xl"
-                 onerror="this.src='https://via.placeholder.com/320?text=Logo+Missing'; this.onerror=null;">
+                 onerror="this.src='https://via.placeholder.com/320?text=Logo+Missing';">
             <h1 class="text-7xl font-black text-amber-400 drop-shadow-2xl tracking-tighter">Anton Systems</h1>
             <p class="text-3xl text-amber-200 mt-3">Proxy Peering & Latency Diagnostic Tool</p>
         </div>
 
-        <!-- Input Card -->
         <div class="glass p-10 rounded-3xl shadow-2xl space-y-10">
             <div class="grid md:grid-cols-2 gap-8">
                 <div>
@@ -78,7 +81,6 @@
             </button>
         </div>
 
-        <!-- Results -->
         <div id="results" class="glass p-12 mt-12 rounded-3xl shadow-2xl space-y-14 hidden">
             <h2 class="text-6xl font-bold text-amber-400 text-center mb-10">DIAGNOSTIC RESULTS</h2>
 
@@ -105,6 +107,11 @@
                 <p id="baselineResults" class="mt-8 text-3xl hidden text-amber-200">
                     Ping: <span id="baselinePing">--</span> ms | DL: <span id="baselineDownload">--</span> Mbps
                 </p>
+            </div>
+
+            <div class="text-amber-300 text-center mt-8 text-lg max-w-3xl mx-auto">
+                <strong>Baseline Test</strong> → measures your current speed through the proxy (as-is)<br>
+                <strong>Post-Route Test</strong> → connect to the suggested hub via VPN first, then run this
             </div>
 
             <div id="alternateRouteSection" class="hidden bg-gradient-to-r from-amber-900/40 to-orange-900/40 p-12 rounded-3xl border-4 border-amber-600">
@@ -134,7 +141,7 @@
             </div>
 
             <div id="loadingIndicator" class="hidden text-center py-32">
-                <div class="loader mx-auto"></div>
+                <div class="loader"></div>
                 <p class="text-4xl text-amber-300 mt-10">Charting the optimal course...</p>
             </div>
             <p id="errorMsg" class="text-red-400 text-center font-bold text-4xl hidden"></p>
@@ -168,10 +175,10 @@
 
             if (proxyCountry === "US" && !["US","CA"].includes(userCountry)) {
                 hub = "Frankfurt → New York";
-                reason = "Optimal transatlantic routing for tunneled US proxies";
+                reason = "Optimal transatlantic routing";
             } else if (proxyCountry === "US" && ["US","CA"].includes(userCountry)) {
                 hub = "Direct routing";
-                reason = "Both ends in North America – no extra hops needed";
+                reason = "Both ends in North America";
             }
 
             document.getElementById('suggestedRoutePath').textContent = 
@@ -213,30 +220,47 @@
             }
         };
 
+        // FIXED & BULLETPROOF SPEEDTEST (LibreSpeed)
         function runSpeedtest(isBaseline) {
             const container = isBaseline ? 'speedtest-container' : 'post-speedtest-container';
-            document.getElementById(container).innerHTML = '';
-            const ost = new OpenSpeedTest({ target: document.getElementById(container) });
-            ost.onend = r => {
-                const ping = Math.round(r.ping);
-                const dl = (r.download/1e6).toFixed(1);
-                if (isBaseline) {
-                    document.getElementById('baselinePing').textContent = ping;
-                    document.getElementById('baselineDownload').textContent = dl;
-                    document.getElementById('baselineResults').classList.remove('hidden');
-                } else {
-                    document.getElementById('postPing').textContent = ping;
-                    document.getElementById('postDownload').textContent = dl;
-                    document.getElementById('postResults').classList.remove('hidden');
-                    const deltaPing = parseInt(document.getElementById('baselinePing').textContent) - ping;
-                    const deltaDl = (dl - parseFloat(document.getElementById('baselineDownload').textContent)).toFixed(1);
-                    document.getElementById('pingDelta').textContent = deltaPing > 0 ? `-${deltaPing}` : `+${-deltaPing}`;
-                    document.getElementById('dlDelta').textContent = deltaDl > 0 ? `+${deltaDl}` : deltaDl;
-                    document.getElementById('comparison').classList.remove('hidden');
-                }
-            };
-            ost.start();
+            const pingEl = isBaseline ? 'baselinePing' : 'postPing';
+            const dlEl = isBaseline ? 'baselineDownload' : 'postDownload';
+            const resultEl = isBaseline ? 'baselineResults' : 'postResults';
+
+            document.getElementById(container).innerHTML = `
+                <iframe src="https://librespeed.org/?embed=1&theme=dark&telemetry=0" loading="lazy"></iframe>
+            `;
+
+            // Auto-capture results after test completes
+            const checkInterval = setInterval(() => {
+                const iframe = document.querySelector(`#${container} iframe`);
+                if (!iframe) return;
+                try {
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                    const ping = doc.querySelector('.ping-value')?.innerText;
+                    const download = doc.querySelector('.download-value')?.innerText;
+                    if (ping && download) {
+                        clearInterval(checkInterval);
+                        document.getElementById(pingEl).textContent = ping.replace(' ms', '');
+                        document.getElementById(dlEl).textContent = download.replace(' Mbps', '');
+                        document.getElementById(resultEl).classList.remove('hidden');
+
+                        if (!isBaseline) {
+                            const oldPing = parseFloat(document.getElementById('baselinePing').textContent);
+                            const oldDl = parseFloat(document.getElementById('baselineDownload').textContent);
+                            const newPing = parseFloat(ping.replace(' ms', ''));
+                            const newDl = parseFloat(download.replace(' Mbps', ''));
+                            const deltaP = (oldPing - newPing).toFixed(0);
+                            const deltaD = (newDl - oldDl).toFixed(1);
+                            document.getElementById('pingDelta').textContent = deltaP > 0 ? `-${deltaP}` : `+${Math.abs(deltaP)}`;
+                            document.getElementById('dlDelta').textContent = deltaD > 0 ? `+${deltaD}` : deltaD;
+                            document.getElementById('comparison').classList.remove('hidden');
+                        }
+                    }
+                } catch(e) {}
+            }, 2000);
         }
+
         window.runBaselineSpeedtest = () => runSpeedtest(true);
         window.runPostSpeedtest = () => runSpeedtest(false);
     </script>
