@@ -240,7 +240,7 @@
                             const oldP = parseFloat(document.getElementById('baselinePing').textContent);
                             const oldD = parseFloat(document.getElementById('baselineDownload').textContent);
                             const newP = parseFloat(ping.replace(' ms', ''));
-                            const newD = parseFloat(dl.replace(' Mbps', ''));
+                            const newD = parseFloat(dl.replace(' MBps', ''));
                             const deltaP = (oldP - newP).toFixed(0);
                             const deltaD = (newD - oldD).toFixed(1);
                             document.getElementById('pingDelta').textContent = deltaP > 0 ? `-${deltaP}` : `+${Math.abs(deltaP)}`;
