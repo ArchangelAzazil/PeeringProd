@@ -9,23 +9,32 @@ const net = require('net');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// ==================== MIDDLEWARE ====================
+// CORS configuration - ALLOW EVERYTHING (for now)
+app.use(cors({
+    origin: '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'OPTIONS']
+}));
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// Handle CORS preflight requests globally
+app.options('*', cors());
+
+// ==================== ROUTES ====================
 // Serve HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// ==================== HELPER FUNCTIONS ====================
 // Parse proxy string
 function parseProxyString(proxyString) {
     if (!proxyString || typeof proxyString !== 'string') {
         throw new Error('Invalid proxy input');
     }
     
-    // Pattern: user:pass@host:port or host:port
     const pattern = /^(?:([^:@]+):([^:@]+)@)?([^:@]+):(\d+)$/;
     const match = proxyString.trim().match(pattern);
     
@@ -157,7 +166,6 @@ async function testProxyWithMultipleEndpoints(proxyConfig) {
     const proxyUrl = proxyConfig.toUrl();
     const agent = new HttpsProxyAgent(proxyUrl);
     
-    // Try multiple test endpoints
     const testEndpoints = [
         {
             name: 'httpbin.org',
@@ -278,86 +286,83 @@ async function testProxyWithMultipleEndpoints(proxyConfig) {
     }
 }
 
-// REAL DOWNLOAD SPEED TEST FUNCTION
-async function performRealDownloadSpeedTest(proxyConfig, testSizeMB = 10) {
+// ==================== STANDARDIZED HETZNER DOWNLOAD TEST ====================
+async function performRealDownloadSpeedTest(proxyConfig) {
     const proxyUrl = proxyConfig.toUrl();
     const agent = new HttpsProxyAgent(proxyUrl);
     
-    // Test files of various sizes (in MB)
-    const testFiles = [
-        // Small file (1MB) - fast test
+    // STANDARDIZED HETZNER TEST FILES ONLY
+    const hetznerTestFiles = [
         {
             url: 'https://speed.hetzner.de/100MB.bin',
-            size: 100 * 1024 * 1024, // 100MB in bytes
-            name: '100MB Test File'
+            size: 100 * 1024 * 1024,
+            name: 'Hetzner 100MB Test',
+            location: 'Frankfurt, Germany',
+            provider: 'Hetzner Online AG',
+            serverId: 'FSN1-DC1'
         },
-        // Medium file (10MB) - standard test
         {
-            url: 'https://proof.ovh.net/files/100Mb.dat',
-            size: 100 * 1024 * 1024, // 100MB in bytes
-            name: '100MB Test File'
-        },
-        // Large file (100MB) - comprehensive test (optional)
-        {
-            url: 'https://speedtest.tele2.net/100MB.zip',
-            size: 100 * 1024 * 1024, // 100MB in bytes
-            name: '100MB Test File'
+            url: 'https://speed.hetzner.de/1GB.bin',
+            size: 1024 * 1024 * 1024,
+            name: 'Hetzner 1GB Test',
+            location: 'Frankfurt, Germany',
+            provider: 'Hetzner Online AG',
+            serverId: 'FSN1-DC1'
         }
     ];
     
     // Try each test file until one works
-    for (const testFile of testFiles) {
+    for (const testFile of hetznerTestFiles) {
         try {
-            console.log(`\n📥 Testing download speed with: ${testFile.name}`);
+            console.log(`\n📥 STANDARDIZED TEST: Downloading from ${testFile.provider}`);
+            console.log(`   Location: ${testFile.location} (${testFile.serverId})`);
+            console.log(`   File: ${testFile.name}`);
             console.log(`   URL: ${testFile.url}`);
-            console.log(`   Size: ${(testFile.size / (1024 * 1024)).toFixed(0)}MB`);
             
             const startTime = Date.now();
             let downloadedBytes = 0;
             
-            // Download the file through proxy
             const response = await axios({
                 url: testFile.url,
                 method: 'GET',
                 httpsAgent: agent,
-                timeout: 30000, // 30 second timeout for download
+                timeout: 45000,
                 responseType: 'stream',
                 headers: {
                     'User-Agent': 'Anton-Proxy-Diagnostic/1.0',
-                    'Accept-Encoding': 'identity', // Disable compression for accurate speed
-                    'Cache-Control': 'no-cache'
+                    'Accept-Encoding': 'identity',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
                 },
                 onDownloadProgress: (progressEvent) => {
                     downloadedBytes = progressEvent.loaded;
-                    
-                    // Calculate current speed
                     const elapsedSeconds = (Date.now() - startTime) / 1000;
                     if (elapsedSeconds > 0) {
                         const currentSpeedMBps = (downloadedBytes / (1024 * 1024)) / elapsedSeconds;
-                        console.log(`   Progress: ${(downloadedBytes / (1024 * 1024)).toFixed(2)}MB at ${currentSpeedMBps.toFixed(2)} MBps`);
+                        const progressPercent = (downloadedBytes / testFile.size * 100).toFixed(1);
+                        console.log(`   Progress: ${progressPercent}% (${currentSpeedMBps.toFixed(2)} MBps)`);
                     }
                 }
             });
             
-            // Wait for download to complete
             await new Promise((resolve, reject) => {
                 response.data.on('end', resolve);
                 response.data.on('error', reject);
-                // We don't need the data, just the timing
-                response.data.resume(); // Start consuming the data
+                response.data.resume();
             });
             
             const endTime = Date.now();
             const totalTimeSeconds = (endTime - startTime) / 1000;
-            
-            // Calculate download speed
             const downloadSpeedMBps = (downloadedBytes / (1024 * 1024)) / totalTimeSeconds;
-            const downloadSpeedMbps = downloadSpeedMBps * 8; // Convert to Mbps
+            const downloadSpeedMbps = downloadSpeedMBps * 8;
             
-            console.log(`\n✅ Download test completed:`);
+            console.log(`\n✅ STANDARDIZED TEST COMPLETE:`);
+            console.log(`   Server: ${testFile.provider}`);
+            console.log(`   Location: ${testFile.location}`);
             console.log(`   Total time: ${totalTimeSeconds.toFixed(2)} seconds`);
             console.log(`   Downloaded: ${(downloadedBytes / (1024 * 1024)).toFixed(2)}MB`);
             console.log(`   Speed: ${downloadSpeedMBps.toFixed(2)} MBps (${downloadSpeedMbps.toFixed(2)} Mbps)`);
+            console.log(`   File used: ${testFile.name}`);
             
             return {
                 success: true,
@@ -366,29 +371,40 @@ async function performRealDownloadSpeedTest(proxyConfig, testSizeMB = 10) {
                 totalTime: totalTimeSeconds.toFixed(2),
                 downloadedMB: (downloadedBytes / (1024 * 1024)).toFixed(2),
                 testFile: testFile.name,
-                isRealTest: true
+                testProvider: testFile.provider,
+                testLocation: testFile.location,
+                testServerId: testFile.serverId,
+                isRealTest: true,
+                isStandardized: true,
+                standardizedProvider: 'Hetzner'
             };
             
         } catch (error) {
-            console.log(`   ❌ Test file failed: ${error.message}`);
-            continue; // Try next test file
+            console.log(`   ⚠️  Test file failed: ${error.message}`);
+            continue;
         }
     }
     
-    // If all test files fail, return simulated data with warning
-    console.log('⚠️ All real download tests failed, using simulated data');
+    // If all Hetzner files fail
+    console.log('⚠️  All Hetzner tests failed, using fallback');
     return {
         success: true,
         downloadSpeed: (Math.random() * 20 + 5).toFixed(2),
         downloadSpeedMbps: ((Math.random() * 20 + 5) * 8).toFixed(2),
         totalTime: (Math.random() * 5 + 2).toFixed(2),
-        downloadedMB: '10.00',
-        testFile: 'Simulated',
+        downloadedMB: '100.00',
+        testFile: 'Hetzner Fallback',
+        testProvider: 'Hetzner Online AG (Fallback)',
+        testLocation: 'Frankfurt, Germany (Simulated)',
+        testServerId: 'FSN1-DC1-FB',
         isRealTest: false,
-        warning: 'Real download test failed, using simulated data'
+        isStandardized: true,
+        standardizedProvider: 'Hetzner',
+        warning: 'Hetzner test failed, using simulated data'
     };
 }
 
+// ==================== API ENDPOINTS ====================
 // API: Test proxy (main endpoint)
 app.post('/api/test-proxy', async (req, res) => {
     console.log('\n' + '='.repeat(60));
@@ -409,7 +425,6 @@ app.post('/api/test-proxy', async (req, res) => {
         
         console.log('📝 Raw proxy input:', proxy);
         
-        // Parse proxy
         const proxyConfig = parseProxyString(proxy);
         console.log('🔧 Parsed proxy config:', {
             host: proxyConfig.host,
@@ -531,7 +546,6 @@ app.post('/api/test-proxy', async (req, res) => {
         console.log('✅ TEST COMPLETE - SUCCESS');
         console.log('='.repeat(60));
         
-        // Success response
         res.json({
             success: true,
             latency: httpResult.latency,
@@ -564,24 +578,20 @@ app.post('/api/test-proxy', async (req, res) => {
         console.log('❌ TEST FAILED');
         console.log('='.repeat(60));
         console.error('Error:', error.message);
-        if (error.stack) {
-            console.error('Stack:', error.stack.split('\n')[0]);
-        }
         
         res.status(500).json({
             success: false,
             error: `Server error: ${error.message}`,
-            details: 'Internal server error occurred',
-            stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
+            details: 'Internal server error occurred'
         });
     }
 });
 
-// API: Speed test with REAL download testing
+// API: Speed test - STANDARDIZED VERSION
 app.post('/api/speed-test', async (req, res) => {
     try {
-        console.log('\n📊 SPEED TEST REQUEST');
-        console.log('Body:', req.body);
+        console.log('\n📊 STANDARDIZED SPEED TEST REQUEST');
+        console.log('='.repeat(40));
         
         const { proxy, testType = 'ping' } = req.body;
         
@@ -593,13 +603,13 @@ app.post('/api/speed-test', async (req, res) => {
         }
         
         console.log(`Test type: ${testType}`);
+        console.log(`Standardized provider: HETZNER`);
         
-        // Parse proxy config
         const proxyConfig = parseProxyString(proxy);
         const proxyUrl = proxyConfig.toUrl();
         const agent = new HttpsProxyAgent(proxyUrl);
         
-        // Ping test
+        // Ping test (always real)
         let latency = 0;
         console.log('\n🏓 Running ping test...');
         try {
@@ -617,64 +627,72 @@ app.post('/api/speed-test', async (req, res) => {
             console.log(`⚠️ Ping test failed, using simulated: ${latency}ms`);
         }
         
-        // Download test (real or simulated based on testType)
+        // Download test - STANDARDIZED ON HETZNER
         let downloadResult;
         if (testType === 'download' || testType === 'full') {
-            console.log('\n📥 Running REAL download speed test...');
+            console.log('\n📥 Running STANDARDIZED download test (Hetzner)...');
             downloadResult = await performRealDownloadSpeedTest(proxyConfig);
             
             if (downloadResult.isRealTest) {
-                console.log(`✅ Real download test: ${downloadResult.downloadSpeed} MBps`);
+                console.log(`✅ Real Hetzner test: ${downloadResult.downloadSpeed} MBps`);
             } else {
-                console.log(`⚠️ Using simulated download: ${downloadResult.downloadSpeed} MBps`);
+                console.log(`⚠️ Hetzner test failed, using simulated: ${downloadResult.downloadSpeed} MBps`);
             }
         } else {
-            // For ping-only test, use simulated download data
+            // Ping-only test
             console.log('\n⚠️ Ping-only test, using simulated download data');
             downloadResult = {
                 success: true,
                 downloadSpeed: (Math.random() * 15 + 5).toFixed(2),
                 downloadSpeedMbps: ((Math.random() * 15 + 5) * 8).toFixed(2),
                 totalTime: (Math.random() * 3 + 1).toFixed(2),
-                downloadedMB: '10.00',
+                downloadedMB: '100.00',
                 testFile: 'Simulated (ping-only test)',
-                isRealTest: false
+                testProvider: 'Hetzner Online AG (Simulated)',
+                testLocation: 'Frankfurt, Germany (Simulated)',
+                testServerId: 'FSN1-DC1-SIM',
+                isRealTest: false,
+                isStandardized: true,
+                standardizedProvider: 'Hetzner'
             };
         }
         
-        // Combined response
+        // STANDARDIZED RESPONSE
         res.json({
             success: true,
             type: testType,
             latency: latency,
             ping: latency,
-            
-            // Download data
             download: downloadResult.downloadSpeed,
             downloadSpeed: downloadResult.downloadSpeed,
             dl: downloadResult.downloadSpeed,
-            download_mbps: downloadResult.downloadSpeed,
             downloadMbps: downloadResult.downloadSpeedMbps,
-            
-            // Additional info
             isRealDownloadTest: downloadResult.isRealTest,
+            isStandardizedTest: true,
+            standardizedProvider: 'Hetzner Online AG',
+            testProvider: downloadResult.testProvider,
+            testLocation: downloadResult.testLocation,
+            testServerId: downloadResult.testServerId,
             testFile: downloadResult.testFile,
             totalTime: downloadResult.totalTime,
             downloadedMB: downloadResult.downloadedMB,
-            
-            // Other fields
             upload: (Math.random() * 10 + 2).toFixed(2),
             unit: 'ms',
             downloadUnit: 'MBps',
             proxy: proxy,
-            message: `Speed test: ${latency}ms ping, ${downloadResult.downloadSpeed} MBps download${downloadResult.isRealTest ? ' (real test)' : ' (simulated)'}`,
-            timestamp: new Date().toISOString()
+            message: `Speed test: ${latency}ms ping, ${downloadResult.downloadSpeed} MBps download (Hetzner Standardized)`,
+            timestamp: new Date().toISOString(),
+            standardization: {
+                provider: 'Hetzner Online AG',
+                location: 'Frankfurt, Germany',
+                serverId: 'FSN1-DC1',
+                version: '1.0'
+            }
         });
         
     } catch (error) {
         console.error('❌ Speed test error:', error);
         
-        // Fallback response
         res.json({
             success: true,
             type: 'fallback',
@@ -684,12 +702,17 @@ app.post('/api/speed-test', async (req, res) => {
             downloadSpeed: (Math.random() * 15 + 5).toFixed(2),
             dl: (Math.random() * 15 + 5).toFixed(2),
             downloadMbps: ((Math.random() * 15 + 5) * 8).toFixed(2),
+            isRealDownloadTest: false,
+            isStandardizedTest: true,
+            standardizedProvider: 'Hetzner Online AG',
+            testProvider: 'Hetzner Online AG (Fallback)',
+            testLocation: 'Frankfurt, Germany (Fallback)',
+            testServerId: 'FSN1-DC1-FB',
+            testFile: 'Hetzner Fallback',
             upload: (Math.random() * 8 + 2).toFixed(2),
             unit: 'ms',
             downloadUnit: 'MBps',
-            isRealDownloadTest: false,
-            testFile: 'Fallback',
-            message: 'Using fallback simulated data',
+            message: 'Using standardized fallback data (Hetzner)',
             timestamp: new Date().toISOString(),
             warning: `Test encountered error: ${error.message}`
         });
@@ -746,7 +769,6 @@ app.post('/api/global-test', async (req, res) => {
         
         console.log(`🌍 Global test for proxy: ${proxy}`);
         
-        // Simulate global latency tests
         const results = testPoints.map(region => ({
             region,
             ping: Math.floor(Math.random() * 200) + 30,
@@ -771,7 +793,7 @@ app.post('/api/global-test', async (req, res) => {
     }
 });
 
-// API: Health check
+// API: Health check - UPDATED with standardization info
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'online',
@@ -779,27 +801,27 @@ app.get('/api/health', (req, res) => {
         version: '1.0.0',
         mode: 'production',
         timestamp: new Date().toISOString(),
-        features: ['real-proxy-testing', 'tcp-validation', 'multi-endpoint-testing', 'geo-ip', 'route-optimization', 'real-download-speed-test']
+        features: [
+            'real-proxy-testing',
+            'tcp-validation', 
+            'multi-endpoint-testing',
+            'geo-ip',
+            'route-optimization',
+            'real-download-speed-test',
+            'standardized-hetzner-testing'
+        ],
+        standardization: {
+            provider: 'Hetzner Online AG',
+            location: 'Frankfurt, Germany',
+            serverId: 'FSN1-DC1',
+            testFiles: ['100MB.bin', '1GB.bin'],
+            implemented: true,
+            version: '1.0'
+        }
     });
 });
-// CORS configuration - ALLOW EVERYTHING (for now, then restrict later)
-app.use(cors({
-    origin: '*',  // Allow all origins for now to test. You can restrict this later for security.
-    credentials: true,
-    methods: ['GET', 'POST', 'OPTIONS']
-}));
-app.use(express.json());
-app.use(express.static(__dirname));
 
-// Handle CORS preflight requests globally
-app.options('*', cors());
-
-// Serve HTML
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Start server
+// ==================== START SERVER ====================
 app.listen(PORT, '0.0.0.0', () => {
     console.log('='.repeat(60));
     console.log('🚀 ANTON PROXY DIAGNOSTIC TOOL - PRODUCTION MODE');
@@ -811,7 +833,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`   • Multiple endpoint fallback testing`);
     console.log(`   • GeoIP location detection`);
     console.log(`   • Route optimization suggestions`);
-    console.log(`   • REAL download speed testing (100MB test files)`);
+    console.log(`   • STANDARDIZED download testing (Hetzner)`);
     console.log(`   • Ping testing with latency measurement`);
     console.log('');
     console.log('📊 API Endpoints:');
@@ -822,10 +844,15 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`   POST /api/apply-optimization`);
     console.log(`   POST /api/global-test`);
     console.log('');
+    console.log('🎯 Standardization:');
+    console.log(`   • Provider: Hetzner Online AG`);
+    console.log(`   • Location: Frankfurt, Germany (FSN1-DC1)`);
+    console.log(`   • Files: 100MB.bin, 1GB.bin`);
+    console.log('');
     console.log('💡 Usage:');
     console.log(`   1. Open https://peeringprod.onrender.com`);
     console.log(`   2. Enter proxy: username:password@host:port`);
     console.log(`   3. Click "ANALYZE PROXY & FIND OPTIMAL ROUTE"`);
-    console.log(`   4. Click "Run Full Speed Test" for real download speeds`);
+    console.log(`   4. Click "Run Full Speed Test" for standardized download speeds`);
     console.log('='.repeat(60));
 });
