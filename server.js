@@ -782,6 +782,13 @@ app.get('/api/health', (req, res) => {
         features: ['real-proxy-testing', 'tcp-validation', 'multi-endpoint-testing', 'geo-ip', 'route-optimization', 'real-download-speed-test']
     });
 });
+// CORS configuration - ALLOW EVERYTHING (for now, then restrict later)
+app.use(cors({
+    origin: '*',  // Allow ALL origins for now
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
 
 // Start server
 app.listen(PORT, () => {
