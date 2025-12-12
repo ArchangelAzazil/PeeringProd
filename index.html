@@ -18,14 +18,50 @@
         .proxy-badge { padding: 1rem 2rem; border-radius: 1rem; font-size: 1.5rem; font-weight: bold; margin: 1rem auto; display: inline-block; }
         .residential { background: #10b981; color: white; }
         .datacenter { background: #ef4444; color: white; }
+        
+        /* Terminal styling */
+        .terminal {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #00ff00;
+            height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin: 20px 0;
+        }
+        .terminal-line { margin-bottom: 4px; }
+        .terminal-command { color: #ffff00; }
+        .terminal-response { color: #00ffff; }
+        .terminal-error { color: #ff5555; }
+        .terminal-success { color: #55ff55; }
+        
+        /* Progress bar */
+        .progress-bar {
+            height: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body class="p-6">
     <div class="max-w-6xl mx-auto">
         <div class="text-center mb-12">
-            <img src="assets/logo.png" alt="Anton Systems" class="w-80 h-80 mx-auto mb-6 object-contain drop-shadow-2xl" onerror="this.src='https://via.placeholder.com/320x320/000/fff?text=Logo';">
+            <img src="assets/logo.png" alt="Anton Systems" class="w-80 h-80 mx-auto mb-6 object-contain drop-shadow-2xl">
             <h1 class="text-7xl font-black text-amber-400 drop-shadow-2xl tracking-tighter">Anton Systems</h1>
             <p class="text-3xl text-amber-200 mt-3">Proxy Peering & Latency Diagnostic Tool</p>
+            <p class="text-lg text-gray-400 mt-2" id="serverStatus">Initializing...</p>
         </div>
 
         <div class="glass p-10 rounded-3xl shadow-2xl space-y-10">
@@ -35,8 +71,9 @@
                     <input type="text" id="userLocation" value="New York, US" class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
                 </div>
                 <div>
-                    <label class="block text-amber-300 font-bold mb-3 text-lg">Proxy (username:password@ip:port or just IP)</label>
-                    <input type="text" id="proxyInput" placeholder="8wFywmdhdcmZeq1:5YpId6OQZOxxB9y@92.112.157.125:48746" class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
+                    <label class="block text-amber-300 font-bold mb-3 text-lg">Proxy (user:pass@host:port)</label>
+                    <input type="text" id="proxyInput" placeholder="username:password@92.112.157.125:48746" class="w-full p-4 rounded-xl bg-gray-900 border border-amber-800 focus:border-amber-400 text-white text-lg">
+                    <p class="text-sm text-gray-400 mt-2">Format: username:password@host:port or host:port</p>
                 </div>
             </div>
             <button onclick="startAnalysis()" class="btn-anton w-full py-7 rounded-2xl font-black text-4xl text-black shadow-2xl tracking-wider">
@@ -44,216 +81,601 @@
             </button>
         </div>
 
+        <!-- Terminal Output -->
+        <div class="glass p-6 mt-8 rounded-3xl hidden" id="terminalSection">
+            <h3 class="text-2xl font-bold text-amber-400 mb-4">Diagnostic Console</h3>
+            <div class="terminal" id="terminalOutput">
+                $ System initialized. Ready for proxy analysis.
+            </div>
+        </div>
+
         <div id="results" class="glass p-12 mt-12 rounded-3xl shadow-2xl space-y-14 hidden">
             <h2 class="text-6xl font-bold text-amber-400 text-center mb-10">DIAGNOSTIC RESULTS</h2>
 
-            <!-- Proxy Type Badge -->
-            <div class="text-center">
-                <span id="proxyTypeBadge" class="proxy-badge">Detecting...</span>
-            </div>
-
-            <div class="grid md:grid-cols-3 gap-10 text-center">
-                <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900">
-                    <span class="text-amber-300 text-xl block mb-3">Exit Location</span>
-                    <span id="proxyLocation" class="text-4xl font-bold text-white">--</span>
+            <!-- Loading Indicator -->
+            <div id="loadingIndicator" class="text-center py-32">
+                <div class="loader mb-6"></div>
+                <p class="text-4xl text-amber-300 mt-10" id="loadingText">Charting the optimal course...</p>
+                <div class="progress-bar max-w-md mx-auto mt-8">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
                 </div>
-                <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900">
-                    <span class="text-amber-300 text-xl block mb-3">ISP / ASN</span>
-                    <span id="proxyISP" class="text-3xl font-bold text-white">--</span>
+                <p id="progressText" class="text-gray-400 mt-4">Initializing</p>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMsg" class="text-center p-8 bg-red-900/50 rounded-xl border border-red-700 hidden">
+                <p class="text-4xl text-red-300" id="errorText"></p>
+                <p class="text-gray-300 mt-2" id="errorDetails"></p>
+                <button onclick="retryAnalysis()" class="mt-6 px-8 py-3 bg-red-700 hover:bg-red-600 rounded-lg font-bold">
+                    Retry Analysis
+                </button>
+            </div>
+
+            <!-- Proxy Information Section -->
+            <div id="proxyInfo" class="space-y-14 hidden">
+                <!-- Proxy Type Badge -->
+                <div class="text-center">
+                    <span id="proxyTypeBadge" class="proxy-badge">Detecting...</span>
                 </div>
-                <div class="bg-gray-900/80 p-10 rounded-2xl text-sm border border-amber-900">
-                    <span class="text-amber-300 block mb-3">PeeringDB</span>
-                    <span id="pdbSummary" class="text-gray-300">Loading...</span>
+
+                <div class="grid md:grid-cols-3 gap-10 text-center">
+                    <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900">
+                        <span class="text-amber-300 text-xl block mb-3">Exit Location</span>
+                        <span id="proxyLocation" class="text-4xl font-bold text-white">--</span>
+                    </div>
+                    <div class="bg-gray-900/80 p-10 rounded-2xl border border-amber-900">
+                        <span class="text-amber-300 text-xl block mb-3">ISP / ASN</span>
+                        <span id="proxyISP" class="text-3xl font-bold text-white">--</span>
+                    </div>
+                    <div class="bg-gray-900/80 p-10 rounded-2xl text-sm border border-amber-900">
+                        <span class="text-amber-300 block mb-3">Network Info</span>
+                        <span id="pdbSummary" class="text-gray-300">Loading...</span>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <h3 class="text-4xl font-bold text-amber-300 mb-8">1. Baseline Speedtest (Current Route)</h3>
+                    <div id="speedtest-container"></div>
+                    <button onclick="runBaselineSpeedtest()" class="btn-anton py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Baseline Test</button>
+                    <button onclick="runFullSpeedTestButton()" class="bg-blue-600 hover:bg-blue-500 py-3 px-8 rounded-xl font-bold text-xl mt-4 ml-4">Run Full Speed Test</button>
+                    <p id="baselineResults" class="mt-8 text-3xl text-amber-200">Ping: <span id="baselinePing">--</span> ms | DL: <span id="baselineDownload">--</span> MBps</p>
+                </div>
+
+                <div class="text-amber-300 text-center mt-8 text-lg max-w-3xl mx-auto">
+                    <strong>Baseline Test</strong> → measures your current speed through the proxy (as-is)<br>
+                    <strong>Post-Route Test</strong> → connect to the suggested route, then run this to see the improvement
+                </div>
+
+                <div id="alternateRouteSection" class="hidden bg-gradient-to-r from-amber-900/40 to-orange-900/40 p-12 rounded-3xl border-4 border-amber-600 text-center">
+                    <h3 class="text-5xl font-bold text-amber-100 mb-8">OPTIMAL ROUTE RECOMMENDATION</h3>
+                    <div class="text-5xl font-mono text-amber-50 mb-6" id="suggestedRoutePath">--</div>
+                    <p class="text-amber-200 text-2xl" id="routeReason">--</p>
+                    <button onclick="applyOptimization()" class="mt-8 px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 rounded-xl font-bold text-xl">
+                        Apply Optimization
+                    </button>
+                </div>
+
+                <div id="postRouteSpeedtestSection" class="hidden text-center">
+                    <h3 class="text-4xl font-bold text-green-400 mb-8">2. After Applying Route</h3>
+                    <div id="post-speedtest-container"></div>
+                    <button onclick="runPostSpeedtest()" class="bg-green-600 hover:bg-green-500 py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Post-Route Test</button>
+                    <p id="postResults" class="mt-8 text-3xl text-green-300">Ping: <span id="postPing">--</span> ms | DL: <span id="postDownload">--</span> MBps</p>
+                    <p id="comparison" class="text-5xl font-bold text-green-400 mt-12 hidden">Improvement → Ping <span id="pingDelta">--</span> ms | Download <span id="dlDelta">--</span> MBps</p>
+                </div>
+
+                <div class="text-center mt-16">
+                    <a id="pingPeLink" target="_blank" class="inline-block bg-emerald-600 hover:bg-emerald-500 py-6 px-20 rounded-2xl font-bold text-3xl shadow-2xl">Global MTR / TraceRoute Test</a>
                 </div>
             </div>
-
-            <div class="text-center">
-                <h3 class="text-4xl font-bold text-amber-300 mb-8">1. Baseline Speedtest (Current Route)</h3>
-                <div id="speedtest-container"></div>
-                <button onclick="runBaselineSpeedtest()" class="btn-anton py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Baseline Test</button>
-                <p id="baselineResults" class="mt-8 text-3xl hidden text-amber-200">Ping: <span id="baselinePing">--</span> ms | DL: <span id="baselineDownload">--</span> MBps</p>
-            </div>
-
-            <div class="text-amber-300 text-center mt-8 text-lg max-w-3xl mx-auto">
-                <strong>Baseline Test</strong> → measures your current speed through the proxy (as-is)<br>
-                <strong>Post-Route Test</strong> → connect to the suggested route, then run this to see the improvement
-            </div>
-
-            <div id="alternateRouteSection" class="hidden bg-gradient-to-r from-amber-900/40 to-orange-900/40 p-12 rounded-3xl border-4 border-amber-600 text-center">
-                <h3 class="text-5xl font-bold text-amber-100 mb-8">OPTIMAL ROUTE RECOMMENDATION</h3>
-                <div class="text-5xl font-mono text-amber-50 mb-6" id="suggestedRoutePath">--</div>
-                <p class="text-amber-200 text-2xl" id="routeReason">--</p>
-            </div>
-
-            <div id="postRouteSpeedtestSection" class="hidden text-center">
-                <h3 class="text-4xl font-bold text-green-400 mb-8">2. After Applying Route</h3>
-                <div id="post-speedtest-container"></div>
-                <button onclick="runPostSpeedtest()" class="bg-green-600 hover:bg-green-500 py-5 px-12 rounded-xl font-bold text-2xl mt-8">Run Post-Route Test</button>
-                <p id="postResults" class="mt-8 text-3xl hidden text-green-300">Ping: <span id="postPing">--</span> ms | DL: <span id="postDownload">--</span> MBps</p>
-                <p id="comparison" class="text-5xl font-bold text-green-400 mt-12 hidden">Improvement → Ping <span id="pingDelta">--</span> ms | Download <span id="dlDelta">--</span> MBps</p>
-            </div>
-
-            <div class="text-center mt-16">
-                <a id="pingPeLink" target="_blank" class="inline-block bg-emerald-600 hover:bg-emerald-500 py-6 px-20 rounded-2xl font-bold text-3xl shadow-2xl">Global MTR / TraceRoute Test</a>
-            </div>
-
-            <div id="loadingIndicator" class="hidden text-center py-32"><div class="loader"></div><p class="text-4xl text-amber-300 mt-10">Charting the optimal course...</p></div>
-            <p id="errorMsg" class="text-red-400 text-center font-bold text-4xl hidden"></p>
         </div>
     </div>
 
     <script>
-        const TOKEN = atob("NzBhMDA2Y2NkNTlmMTA=");
+        // Configuration
+        const API_BASE = 'http://localhost:3000';
         let currentProxy = null;
+        let testResults = {};
 
+        // Terminal output functions
+        function logToTerminal(message, type = 'response') {
+            const terminal = document.getElementById('terminalOutput');
+            const line = document.createElement('div');
+            line.className = `terminal-line terminal-${type}`;
+            line.textContent = `> ${message}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function showTerminal() {
+            document.getElementById('terminalSection').classList.remove('hidden');
+        }
+
+        // Progress functions
+        function updateProgress(step, total, message) {
+            const percent = Math.round((step / total) * 100);
+            document.getElementById('progressFill').style.width = `${percent}%`;
+            document.getElementById('progressText').textContent = message;
+            document.getElementById('loadingText').textContent = message;
+        }
+
+        // Show/hide error
+        function showError(message, details = '') {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorDetails').textContent = details;
+            document.getElementById('errorMsg').classList.remove('hidden');
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            logToTerminal(`ERROR: ${message}`, 'error');
+        }
+
+        function hideError() {
+            document.getElementById('errorMsg').classList.add('hidden');
+        }
+
+        // Parse proxy input (supports user:pass@host:port format)
         function parseProxy(input) {
-            const regex = /^(?:([^:]+):([^@]+)@)?([^:]+):?(\d*)$/;
+            const regex = /^(?:([^:@]+):([^:@]+)@)?([^:@]+):(\d+)$/;
             const match = input.trim().match(regex);
-            if (!match) return { ip: input.trim() };
-            const [, user, pass, ip, port] = match;
-            return { ip, port: port || null, user, pass };
-        }
-
-        async function detectProxyType(ip) {
-            try {
-                const data = await fetchIPInfo(ip);
-                const org = (data.org || data.company?.name || "").toLowerCase();
-                const asn = data.org?.match(/AS\d+/)?.[0] || "";
-                const hostingKeywords = ["hosting", "datacenter", "cloud", "server", "zenlayer", "ovh", "digitalocean", "amazon", "hetzner", "linode", "vultr", "contabo", "gcore", "scaleway"];
-                const isHosting = hostingKeywords.some(k => org.includes(k)) || asn && asn.toLowerCase().includes("hosting");
-
-                const type = isHosting ? "DATACENTER / IDC" : "RESIDENTIAL ISP";
-                const confidence = isHosting ? "99%" : "95%";
-
-                const badge = document.getElementById("proxyTypeBadge");
-                badge.innerHTML = `${type}<br><small class="text-sm">${confidence} confidence</small>`;
-                badge.className = "proxy-badge " + (type.includes("RESIDENTIAL") ? "residential" : "datacenter");
-            } catch (e) {
-                document.getElementById("proxyTypeBadge").innerHTML = "Detection failed<br><small>Check IP or try again</small>";
-                document.getElementById("proxyTypeBadge").className = "proxy-badge bg-gray-600 text-white";
+            
+            if (!match) {
+                throw new Error('Invalid format. Use: username:password@host:port or host:port');
             }
-        }
-
-        async function fetchIPInfo(ip) {
-            const r = await fetch(`https://ipinfo.io/${ip}/json?token=${TOKEN}`);
-            if (!r.ok) throw new Error("IPinfo failed");
-            return r.json();
-        }
-
-        async function fetchPeeringDB(asn) {
-            try {
-                const netResponse = await fetch(`https://www.peeringdb.com/api/net?asn=${asn}`);
-                const netData = await netResponse.json();
-                if (!netData.data || netData.data.length === 0) return "No PeeringDB record";
-                const net = netData.data[0];
-                const ixResponse = await fetch(`https://www.peeringdb.com/api/netixlan?net_id=${net.id}`);
-                const ixData = await ixResponse.json();
-                if (ixData.data && ixData.data.length > 0) {
-                    const ixps = ixData.data.slice(0, 5).map(ix => ix.ix_name).join(', ');
-                    return `${net.name} – Active IXPs: ${ixps}`;
+            
+            const [, user, pass, host, port] = match;
+            
+            if (!host || !port) {
+                throw new Error('Host and port are required');
+            }
+            
+            return {
+                ip: host,
+                port: parseInt(port),
+                user: user || null,
+                pass: pass || null,
+                toString() {
+                    if (user && pass) {
+                        return `${user}:${pass}@${host}:${port}`;
+                    }
+                    return `${host}:${port}`;
                 }
-                return `${net.name} – No IXPs listed`;
-            } catch (e) {
-                return "PeeringDB unavailable (API limit or no data)";
-            }
+            };
         }
 
-        function suggestOptimalRoute(userLocation, proxyCity, proxyCountry) {
-            const userCountry = userLocation.split(',').pop().trim().toUpperCase();
-            let hub = "Frankfurt DE-CIX";
-            let reason = "Largest global IXP – best default path for most proxies";
-
-            if (proxyCountry === "US" && !["US","CA"].includes(userCountry)) {
-                hub = "Frankfurt → New York";
-                reason = "Optimal transatlantic routing for tunneled US proxies";
-            } else if (proxyCountry === "US" && ["US","CA"].includes(userCountry)) {
-                hub = "Direct routing (no tunnel needed)";
-                reason = "Both ends in North America – any extra hop adds latency";
-            } else if (["NL","DE","FR","GB","SE"].includes(proxyCountry)) {
-                hub = "Amsterdam + Frankfurt";
-                reason = "European core hubs – fastest for most EU-based tunnel providers";
-            }
-
-            document.getElementById('suggestedRoutePath').textContent = `${userLocation.split(',')[0].trim()} → ${hub} → ${proxyCity}, ${proxyCountry}`;
-            document.getElementById('routeReason').textContent = reason;
-            document.getElementById('alternateRouteSection').classList.remove('hidden');  // Always show
-        }
-
-        window.startAnalysis = async () => {
-            const input = document.getElementById('proxyInput').value.trim();
-            const loc = document.getElementById('userLocation').value.trim();
-            currentProxy = parseProxy(input);
-            const ip = currentProxy.ip || input;
-
-            document.getElementById('results').classList.add('hidden');
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-
+        // Test proxy connectivity
+        async function testProxyConnection(proxyConfig) {
             try {
-                const data = await fetchIPInfo(ip);
-                document.getElementById('proxyLocation').textContent = `${data.city || 'Unknown'}, ${data.country}`;
-                document.getElementById('proxyISP').textContent = data.org || 'Unknown';
+                updateProgress(1, 5, 'Testing proxy connectivity...');
+                logToTerminal(`Testing connection to ${proxyConfig.toString()}`, 'command');
+                
+                const response = await fetch(`${API_BASE}/api/test-proxy`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        proxy: proxyConfig.toString()
+                    })
+                });
 
-                const asnMatch = data.org?.match(/AS(\d+)/i);
-                const asn = asnMatch ? asnMatch[1] : null;
-                document.getElementById('pdbSummary').textContent = asn ? await fetchPeeringDB(asn) : "No ASN detected";
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
 
-                await detectProxyType(ip);
+                const result = await response.json();
+                
+                if (result.success) {
+                    logToTerminal(`✓ Connected successfully! Latency: ${result.latency}ms`, 'success');
+                    return result;
+                } else {
+                    logToTerminal(`✗ Connection failed: ${result.error}`, 'error');
+                    throw new Error(result.error || 'Proxy connection failed');
+                }
+            } catch (error) {
+                logToTerminal(`Connection error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
 
-                suggestOptimalRoute(loc, data.city || "Proxy", data.country);
+        // Get IP information
+        async function getIPInfo(ip) {
+            try {
+                updateProgress(2, 5, 'Fetching location information...');
+                logToTerminal(`Fetching IP info for: ${ip}`, 'command');
+                
+                const response = await fetch(`${API_BASE}/api/ip-info/${ip}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    logToTerminal(`✓ Location: ${data.city}, ${data.country} | ISP: ${data.isp}`, 'success');
+                    return data;
+                } else {
+                    logToTerminal('Using fallback location data', 'response');
+                    return {
+                        ip: ip,
+                        city: 'Unknown',
+                        country: 'Unknown',
+                        isp: 'Unknown',
+                        asn: 'Unknown'
+                    };
+                }
+            } catch (error) {
+                logToTerminal(`Location fetch failed: ${error.message}`, 'error');
+                return {
+                    ip: ip,
+                    city: 'Unknown',
+                    country: 'Unknown',
+                    isp: 'Unknown',
+                    asn: 'Unknown'
+                };
+            }
+        }
 
-                document.getElementById('pingPeLink').href = `https://ping.pe/${ip}`;
-                document.getElementById('pingPeLink').textContent = `Global Test → ${ip}`;
+        // Detect proxy type
+        function detectProxyType(proxyInfo) {
+            const isp = (proxyInfo.isp || '').toLowerCase();
+            const asn = (proxyInfo.asn || '').toLowerCase();
+            
+            const datacenterKeywords = [
+                'hosting', 'datacenter', 'cloud', 'server', 'vps', 'dedicated',
+                'ovh', 'digitalocean', 'amazon', 'aws', 'google cloud', 'azure',
+                'hetzner', 'linode', 'vultr', 'contabo'
+            ];
+            
+            const vpnKeywords = ['vpn', 'proxy', 'anonymizer', 'tor'];
+            
+            let type = 'RESIDENTIAL ISP';
+            let confidence = '85%';
+            
+            for (const keyword of datacenterKeywords) {
+                if (isp.includes(keyword)) {
+                    type = 'DATACENTER / IDC';
+                    confidence = '99%';
+                    break;
+                }
+            }
+            
+            for (const keyword of vpnKeywords) {
+                if (isp.includes(keyword)) {
+                    type = 'VPN / PROXY SERVICE';
+                    confidence = '95%';
+                    break;
+                }
+            }
+            
+            // Check ASN for hosting patterns
+            if (type === 'RESIDENTIAL ISP' && asn) {
+                const hostingAsns = ['as16276', 'as14061', 'as15169', 'as16509'];
+                if (hostingAsns.includes(asn.toLowerCase())) {
+                    type = 'DATACENTER / IDC';
+                    confidence = '90%';
+                }
+            }
+            
+            return { type, confidence };
+        }
 
-                document.getElementById('loadingIndicator').classList.add('hidden');
+        // Analyze route and suggest optimization
+        async function analyzeRoute(userLocation, proxyInfo) {
+            try {
+                updateProgress(3, 5, 'Analyzing network route...');
+                logToTerminal('Analyzing optimal routing path...', 'command');
+                
+                const userCountry = userLocation.split(',').pop().trim().toUpperCase();
+                const proxyCountry = proxyInfo.country.toUpperCase();
+                const proxyType = detectProxyType(proxyInfo);
+                
+                let hub = "Frankfurt DE-CIX";
+                let reason = "Largest global IXP – best default path for most proxies";
+                
+                // Route optimization logic
+                if (proxyCountry === "US" && !["US","CA"].includes(userCountry)) {
+                    hub = "Frankfurt → New York";
+                    reason = "Optimal transatlantic routing for tunneled US proxies";
+                } else if (proxyCountry === "US" && ["US","CA"].includes(userCountry)) {
+                    hub = "Direct routing (no tunnel needed)";
+                    reason = "Both ends in North America – any extra hop adds latency";
+                } else if (["NL","DE","FR","GB","SE"].includes(proxyCountry)) {
+                    hub = "Amsterdam + Frankfurt";
+                    reason = "European core hubs – fastest for most EU-based tunnel providers";
+                } else if (["JP","KR","SG","HK"].includes(proxyCountry)) {
+                    hub = "Singapore → Tokyo";
+                    reason = "Optimal Asia-Pacific routing through major IXPs";
+                }
+                
+                // For datacenter proxies, suggest residential alternative
+                if (proxyType.type === 'DATACENTER / IDC') {
+                    reason += " | Note: Datacenter IP detected, consider residential proxy for sensitive services";
+                }
+                
+                const route = `${userLocation.split(',')[0].trim()} → ${hub} → ${proxyInfo.city}, ${proxyInfo.country}`;
+                
+                logToTerminal(`✓ Route analysis complete`, 'success');
+                logToTerminal(`  Recommended: ${route}`, 'response');
+                logToTerminal(`  Reason: ${reason}`, 'response');
+                
+                return { route, reason };
+            } catch (error) {
+                logToTerminal(`Route analysis error: ${error.message}`, 'error');
+                return {
+                    route: `${userLocation} → ${proxyInfo.city}, ${proxyInfo.country}`,
+                    reason: 'Direct routing (analysis unavailable)'
+                };
+            }
+        }
+
+        // Run speed test - UPDATED to handle download speed
+        async function runSpeedTest(testType = 'ping') {
+            try {
+                logToTerminal(`Running ${testType} test...`, 'command');
+                
+                const response = await fetch(`${API_BASE}/api/speed-test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        proxy: currentProxy.toString(),
+                        testType: testType
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Always return both latency and download if available
+                    return {
+                        latency: result.latency || result.ping || 0,
+                        download: result.download || result.downloadSpeed || result.dl || result.download_mbps || '--'
+                    };
+                } else {
+                    throw new Error(result.error || 'Speed test failed');
+                }
+            } catch (error) {
+                logToTerminal(`${testType} test failed: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        // Run full speed test (ping + download)
+        async function runFullSpeedTest() {
+            try {
+                logToTerminal('Running full speed test (ping + download)...', 'command');
+                
+                const response = await fetch(`${API_BASE}/api/speed-test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        proxy: currentProxy.toString(),
+                        testType: 'full'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    return {
+                        latency: result.latency || result.ping || 0,
+                        download: result.download || result.downloadSpeed || result.dl || result.download_mbps || '--',
+                        upload: result.upload || result.uploadSpeed || '--'
+                    };
+                } else {
+                    throw new Error(result.error || 'Speed test failed');
+                }
+            } catch (error) {
+                logToTerminal(`Speed test failed: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        // Full speed test button handler
+        async function runFullSpeedTestButton() {
+            try {
+                const results = await runFullSpeedTest();
+                if (results) {
+                    document.getElementById('baselinePing').textContent = results.latency;
+                    document.getElementById('baselineDownload').textContent = results.download;
+                    logToTerminal(`Full speed test complete: ${results.latency}ms ping, ${results.download} MBps download`, 'success');
+                }
+            } catch (error) {
+                alert('Full speed test failed: ' + error.message);
+            }
+        }
+
+        // Main analysis function
+        window.startAnalysis = async () => {
+            try {
+                // Reset UI
+                hideError();
                 document.getElementById('results').classList.remove('hidden');
+                document.getElementById('loadingIndicator').classList.remove('hidden');
+                document.getElementById('proxyInfo').classList.add('hidden');
+                document.getElementById('terminalSection').classList.remove('hidden');
+                showTerminal();
+                
+                // Clear terminal
+                document.getElementById('terminalOutput').innerHTML = '$ Starting proxy diagnostics...';
+                
+                // Get inputs
+                const proxyInput = document.getElementById('proxyInput').value.trim();
+                const userLocation = document.getElementById('userLocation').value.trim();
+                
+                if (!proxyInput) {
+                    throw new Error('Please enter a proxy address');
+                }
+                
+                if (!userLocation) {
+                    throw new Error('Please enter your location');
+                }
+                
+                // Parse proxy
+                currentProxy = parseProxy(proxyInput);
+                
+                // Test connection
+                updateProgress(0, 5, 'Initializing diagnostics...');
+                const connectionResult = await testProxyConnection(currentProxy);
+                
+                // Get IP information
+                const ipInfo = await getIPInfo(currentProxy.ip);
+                
+                // Update UI with proxy information
+                document.getElementById('proxyLocation').textContent = 
+                    `${ipInfo.city || 'Unknown'}, ${ipInfo.country || 'Unknown'}`;
+                document.getElementById('proxyISP').textContent = ipInfo.isp || 'Unknown';
+                document.getElementById('pdbSummary').textContent = 
+                    ipInfo.asn ? `ASN: ${ipInfo.asn}` : 'ASN: Unknown';
+                
+                // Detect and display proxy type
+                const proxyType = detectProxyType(ipInfo);
+                const badge = document.getElementById('proxyTypeBadge');
+                badge.innerHTML = `${proxyType.type}<br><small class="text-sm">${proxyType.confidence} confidence</small>`;
+                badge.className = `proxy-badge ${proxyType.type.includes('DATACENTER') ? 'datacenter' : 'residential'}`;
+                
+                // Analyze route
+                updateProgress(4, 5, 'Optimizing network route...');
+                const routeAnalysis = await analyzeRoute(userLocation, ipInfo);
+                
+                // Update route recommendation
+                document.getElementById('suggestedRoutePath').textContent = routeAnalysis.route;
+                document.getElementById('routeReason').textContent = routeAnalysis.reason;
                 document.getElementById('alternateRouteSection').classList.remove('hidden');
-                document.getElementById('postRouteSpeedtestSection').classList.remove('hidden');
-
-            } catch (err) {
-                document.getElementById('loadingIndicator').classList.add('hidden');
-                document.getElementById('errorMsg').textContent = "Error: " + err.message;
-                document.getElementById('errorMsg').classList.remove('hidden');
+                
+                // Update ping.pe link
+                document.getElementById('pingPeLink').href = `https://ping.pe/${currentProxy.ip}`;
+                document.getElementById('pingPeLink').textContent = `Global Test → ${currentProxy.ip}`;
+                
+                // Update baseline ping
+                if (connectionResult.latency) {
+                    document.getElementById('baselinePing').textContent = connectionResult.latency;
+                }
+                
+                // Show results
+                updateProgress(5, 5, 'Finalizing results...');
+                
+                setTimeout(() => {
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+                    document.getElementById('proxyInfo').classList.remove('hidden');
+                    document.getElementById('postRouteSpeedtestSection').classList.remove('hidden');
+                    
+                    logToTerminal('✓ Diagnostics complete! Results are ready.', 'success');
+                    
+                    // Scroll to results
+                    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+                }, 500);
+                
+            } catch (error) {
+                showError('Analysis failed', error.message);
+                console.error('Analysis error:', error);
             }
         };
 
-        function runSpeedtest(isBaseline) {
-            const container = isBaseline ? 'speedtest-container' : 'post-speedtest-container';
-            const pingEl = isBaseline ? 'baselinePing' : 'postPing';
-            const dlEl = isBaseline ? 'baselineDownload' : 'postDownload';
-            const resultEl = isBaseline ? 'baselineResults' : 'postResults';
+        // Baseline speed test
+        window.runBaselineSpeedtest = async () => {
+            try {
+                const results = await runSpeedTest('ping');
+                if (results) {
+                    document.getElementById('baselinePing').textContent = results.latency;
+                    document.getElementById('baselineDownload').textContent = results.download;
+                    logToTerminal(`Baseline test: ${results.latency}ms ping, ${results.download} MBps download`, 'success');
+                }
+            } catch (error) {
+                alert('Speed test failed: ' + error.message);
+            }
+        };
 
-            document.getElementById(container).innerHTML = `<iframe src="https://librespeed.org/?embed=1&theme=dark&telemetry=0" loading="lazy"></iframe>`;
+        // Post-route speed test
+        window.runPostSpeedtest = async () => {
+            try {
+                const results = await runSpeedTest('ping');
+                if (results) {
+                    document.getElementById('postPing').textContent = results.latency;
+                    document.getElementById('postDownload').textContent = results.download;
+                    
+                    // Calculate improvement
+                    const baselinePing = parseInt(document.getElementById('baselinePing').textContent) || 0;
+                    const baselineDownload = parseFloat(document.getElementById('baselineDownload').textContent) || 0;
+                    const postPing = parseInt(results.latency);
+                    const postDownload = parseFloat(results.download) || 0;
+                    
+                    const pingImprovement = baselinePing - postPing;
+                    const downloadImprovement = postDownload - baselineDownload;
+                    
+                    document.getElementById('pingDelta').textContent = 
+                        pingImprovement > 0 ? `-${pingImprovement}` : `+${Math.abs(pingImprovement)}`;
+                    
+                    document.getElementById('dlDelta').textContent = 
+                        downloadImprovement > 0 ? `+${downloadImprovement.toFixed(2)}` : 
+                        downloadImprovement < 0 ? `${downloadImprovement.toFixed(2)}` : '--';
+                    
+                    document.getElementById('comparison').classList.remove('hidden');
+                    logToTerminal(`Post-route test: ${results.latency}ms ping, ${results.download} MBps download`, 'success');
+                }
+            } catch (error) {
+                alert('Post-route test failed: ' + error.message);
+            }
+        };
 
-            const check = setInterval(() => {
-                const iframe = document.querySelector(`#${container} iframe`);
-                if (!iframe) return;
-                try {
-                    const doc = iframe.contentDocument || iframe.contentWindow.document;
-                    const ping = doc.querySelector('.ping-value')?.innerText || doc.querySelector('[data-test="ping"]')?.innerText;
-                    const dl = doc.querySelector('.download-value')?.innerText || doc.querySelector('[data-test="download"]')?.innerText;
-                    if (ping && dl) {
-                        clearInterval(check);
-                        document.getElementById(pingEl).textContent = ping.replace(' ms', '');
-                        document.getElementById(dlEl).textContent = dl.replace(' MBps', '');
-                        document.getElementById(resultEl).classList.remove('hidden');
-                        if (!isBaseline) {
-                            const oldP = parseFloat(document.getElementById('baselinePing').textContent);
-                            const oldD = parseFloat(document.getElementById('baselineDownload').textContent);
-                            const newP = parseFloat(ping.replace(' ms', ''));
-                            const newD = parseFloat(dl.replace(' MBps', ''));
-                            const deltaP = (oldP - newP).toFixed(0);
-                            const deltaD = (newD - oldD).toFixed(1);
-                            document.getElementById('pingDelta').textContent = deltaP > 0 ? `-${deltaP}` : `+${Math.abs(deltaP)}`;
-                            document.getElementById('dlDelta').textContent = deltaD > 0 ? `+${deltaD}` : deltaD;
-                            document.getElementById('comparison').classList.remove('hidden');
-                        }
-                    }
-                } catch(e) {}
-            }, 2000);
+        // Apply optimization (simulated)
+        function applyOptimization() {
+            logToTerminal('Applying route optimization...', 'command');
+            logToTerminal('Route optimization applied (simulated)', 'success');
+            alert('Route optimization logic would be applied here. In production, this would configure routing tables or proxy chains.');
         }
 
-        window.runBaselineSpeedtest = () => runSpeedtest(true);
-        window.runPostSpeedtest = () => runSpeedtest(false);
+        // Retry function
+        function retryAnalysis() {
+            hideError();
+            startAnalysis();
+        }
+
+        // Check server health on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch(`${API_BASE}/api/health`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Server not responding');
+                    return response.json();
+                })
+                .then(data => {
+                    let statusText = `Backend: ${data.status} | v${data.version}`;
+                    if (data.mode === 'production') {
+                        statusText += ' | Mode: PRODUCTION';
+                    }
+                    document.getElementById('serverStatus').textContent = statusText;
+                    logToTerminal(`✅ Connected to production backend: ${data.service}`, 'success');
+                    logToTerminal(`📡 Features: ${data.features?.join(', ') || 'real-proxy-testing'}`, 'response');
+                })
+                .catch(error => {
+                    // Show warning in UI
+                    const resultsDiv = document.getElementById('results');
+                    const warning = document.createElement('div');
+                    warning.className = 'bg-yellow-900/50 p-4 rounded-xl border border-yellow-700 text-center mb-4';
+                    warning.innerHTML = `
+                        <p class="text-yellow-300 font-bold">⚠️ Backend Server Required</p>
+                        <p class="text-gray-300">Please start the backend server:</p>
+                        <code class="bg-black p-2 rounded block mt-2">node server.js</code>
+                        <p class="text-sm text-gray-400 mt-2">Run this command in VS Code terminal</p>
+                    `;
+                    resultsDiv.parentNode.insertBefore(warning, resultsDiv);
+                    logToTerminal('Backend server not detected. Please start the server.', 'error');
+                });
+            
+            logToTerminal('Frontend initialized. Ready for proxy analysis.');
+            logToTerminal('Enter proxy in format: username:password@host:port');
+        });
     </script>
 </body>
 </html>

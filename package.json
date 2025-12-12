@@ -1,0 +1,20 @@
+{
+  "name": "anton-proxy-diagnostic",
+  "version": "1.0.0",
+  "description": "Proxy peering & latency diagnostic tool",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "prod": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "express": "^4.22.1",
+    "geoip-lite": "^1.4.10",
+    "https-proxy-agent": "^7.0.6"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
