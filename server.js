@@ -784,18 +784,27 @@ app.get('/api/health', (req, res) => {
 });
 // CORS configuration - ALLOW EVERYTHING (for now, then restrict later)
 app.use(cors({
-    origin: '*',  // Allow ALL origins for now
+    origin: '*',  // Allow all origins for now to test. You can restrict this later for security.
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+    methods: ['GET', 'POST', 'OPTIONS']
 }));
+app.use(express.json());
+app.use(express.static(__dirname));
+
+// Handle CORS preflight requests globally
+app.options('*', cors());
+
+// Serve HTML
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log('='.repeat(60));
     console.log('🚀 ANTON PROXY DIAGNOSTIC TOOL - PRODUCTION MODE');
     console.log('='.repeat(60));
-    console.log(`📡 Server: http://localhost:${PORT}`);
+    console.log(`📡 Server: http://0.0.0.0:${PORT} (Bound to ALL interfaces)`);
     console.log(`🔧 Environment: ${process.env.NODE_ENV || 'production'}`);
     console.log(`🛠️  Features:`);
     console.log(`   • Real proxy TCP/HTTP testing`);
@@ -814,7 +823,7 @@ app.listen(PORT, () => {
     console.log(`   POST /api/global-test`);
     console.log('');
     console.log('💡 Usage:');
-    console.log(`   1. Open http://localhost:${PORT}`);
+    console.log(`   1. Open https://peeringprod.onrender.com`);
     console.log(`   2. Enter proxy: username:password@host:port`);
     console.log(`   3. Click "ANALYZE PROXY & FIND OPTIMAL ROUTE"`);
     console.log(`   4. Click "Run Full Speed Test" for real download speeds`);
